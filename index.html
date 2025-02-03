@@ -1,0 +1,372 @@
+<html><head><base href="." target="_blank">
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.video-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: auto;
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0);
+    z-index: 0;
+}
+
+.url-input-container {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    display: flex;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    border-radius: 5px;
+}
+
+#urlInput {
+    padding: 8px 15px;
+    border-radius: 5px;
+    border: 1px solid white;
+    background: rgba(255, 255, 255, 0.9);
+    width: 300px;
+    font-family: Arial, sans-serif;
+}
+
+#loadButton {
+    padding: 8px 15px;
+    border-radius: 5px;
+    border: 1px solid white;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    cursor: pointer;
+    font-family: Arial, sans-serif;
+    transition: background-color 0.3s ease;
+}
+
+#loadButton:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.credits-button {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid white;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: Arial, sans-serif;
+    text-decoration: none;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.credits-button:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+@media screen and (max-width: 768px) {
+    .url-input-container {
+        flex-direction: column;
+        width: 90%;
+        top: 10px;
+    }
+
+    #urlInput {
+        width: 100%;
+    }
+
+    .credits-button {
+        padding: 6px 12px;
+        font-size: 12px;
+        top: auto;
+        bottom: 10px;
+        right: 10px;
+    }
+}
+</style>
+</head>
+<body>
+<div class="overlay"></div>
+<div class="video-background">
+    <iframe 
+        width="100%" 
+        height="100%" 
+        src="https://www.youtube.com/embed/Cq56o0YH3mE?autoplay=1&mute=0&loop=1&playlist=Cq56o0YH3mE&playsinline=1&enablejsapi=1&allow-background-playback=1&controls=0" 
+        frameborder="0" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; background-playback; web-share" 
+        allowfullscreen
+        style="position: absolute;">
+    </iframe>
+</div>
+
+<div class="url-input-container">
+    <input type="text" id="urlInput" placeholder="Enter YouTube URL or Video ID">
+    <button id="loadButton">Load Video</button>
+</div>
+
+<a href="https://www.youtube.com/watch?v=Cq56o0YH3mE" class="credits-button" id="creditsButton">CREDITS</a>
+
+<script>
+var tag = document.createElement('script');
+tag.src = "https://www.youtube.com/iframe_api";
+var firstScriptTag = document.getElementsByTagName('script')[0];
+firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+let player;
+let playbackMonitor;
+let lastPlayState = false;
+let currentVideoId = 'Cq56o0YH3mE';
+
+function getYouTubeVideoId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : url;
+}
+
+function loadNewVideo(videoId) {
+    currentVideoId = videoId;
+    const newSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&playlist=${videoId}&playsinline=1&enablejsapi=1&allow-background-playback=1&controls=0`;
+    document.querySelector('iframe').src = newSrc;
+    document.getElementById('creditsButton').href = `https://www.youtube.com/watch?v=${videoId}`;
+    
+    // Reinitialize the player
+    setTimeout(() => {
+        onYouTubeIframeAPIReady();
+    }, 1000);
+}
+
+document.getElementById('loadButton').addEventListener('click', function() {
+    const url = document.getElementById('urlInput').value;
+    if (url) {
+        const videoId = getYouTubeVideoId(url);
+        loadNewVideo(videoId);
+    }
+});
+
+document.getElementById('urlInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        document.getElementById('loadButton').click();
+    }
+});
+
+function onYouTubeIframeAPIReady() {
+    player = new YT.Player(document.querySelector('iframe'), {
+        events: {
+            'onReady': onPlayerReady,
+            'onStateChange': onPlayerStateChange
+        }
+    });
+}
+
+let keepAliveInterval;
+let backgroundPlaybackAttempts = 0;
+const MAX_BACKGROUND_ATTEMPTS = 5;
+
+function forcePlayback() {
+    if (player && typeof player.getPlayerState === 'function') {
+        const state = player.getPlayerState();
+        if (state !== YT.PlayerState.PLAYING) {
+            player.playVideo();
+            if (!player.isMuted()) {
+                player.unMute();
+                player.setVolume(100);
+            }
+            // Add additional force play attempt
+            setTimeout(() => {
+                if (player.getPlayerState() !== YT.PlayerState.PLAYING) {
+                    player.playVideo();
+                }
+            }, 250);
+        }
+    }
+}
+
+function ensurePlayback() {
+    if (player && typeof player.getPlayerState === 'function') {
+        const state = player.getPlayerState();
+        if (state !== YT.PlayerState.PLAYING) {
+            forcePlayback();
+            backgroundPlaybackAttempts++;
+            
+            if (backgroundPlaybackAttempts >= MAX_BACKGROUND_ATTEMPTS) {
+                clearInterval(keepAliveInterval);
+                keepAliveInterval = setInterval(forcePlayback, 500); // Increased frequency
+            }
+        } else {
+            backgroundPlaybackAttempts = 0;
+            clearInterval(keepAliveInterval);
+            keepAliveInterval = setInterval(forcePlayback, 1000); // Increased frequency
+        }
+    }
+}
+
+function onPlayerReady(event) {
+    player = event.target;
+    if (player && typeof player.unMute === 'function') {
+        player.unMute();
+        player.setVolume(100);
+        forcePlayback();
+        
+        // Start continuous playback monitoring
+        playbackMonitor = setInterval(() => {
+            if (player && typeof player.getPlayerState === 'function') {
+                const isPlaying = player.getPlayerState() === YT.PlayerState.PLAYING;
+                if (!isPlaying && lastPlayState) {
+                    forcePlayback();
+                }
+                lastPlayState = isPlaying;
+            }
+        }, 1000);
+    }
+}
+
+function onPlayerStateChange(event) {
+    if (event.data === YT.PlayerState.ENDED || 
+        event.data === YT.PlayerState.PAUSED || 
+        event.data === YT.PlayerState.BUFFERING) {
+        forcePlayback();
+    }
+}
+
+// Enhanced visibility change handling with multiple fallbacks
+document.addEventListener("visibilitychange", function() {
+    if (!document.hidden) {
+        // When becoming visible again, force multiple playback attempts
+        for (let i = 0; i < 5; i++) {
+            setTimeout(forcePlayback, i * 200);
+        }
+    } else {
+        // When hidden, keep trying to play
+        for (let i = 0; i < 3; i++) {
+            setTimeout(forcePlayback, i * 200);
+        }
+    }
+    ensurePlayback();
+});
+
+window.addEventListener('blur', function() {
+    for (let i = 0; i < 3; i++) {
+        setTimeout(forcePlayback, i * 200);
+    }
+    ensurePlayback();
+});
+
+window.addEventListener('focus', function() {
+    backgroundPlaybackAttempts = 0;
+    for (let i = 0; i < 5; i++) {
+        setTimeout(forcePlayback, i * 200);
+    }
+    ensurePlayback();
+});
+
+// Initialize primary keep-alive
+keepAliveInterval = setInterval(() => {
+    ensurePlayback();
+}, 1000);
+
+// Additional recovery interval
+setInterval(() => {
+    if (player && typeof player.getPlayerState === 'function') {
+        const state = player.getPlayerState();
+        if (state !== YT.PlayerState.PLAYING) {
+            for (let i = 0; i < 3; i++) {
+                setTimeout(forcePlayback, i * 200);
+            }
+        }
+    }
+}, 1500);
+
+// Retain all existing event listeners and functionality
+window.addEventListener('load', function() {
+    if (!player || typeof player.unMute !== 'function') {
+        onYouTubeIframeAPIReady();
+    }
+});
+
+document.getElementById('urlInput').addEventListener('touchstart', function(e) {
+    e.preventDefault();
+}, false);
+
+document.getElementById('loadButton').addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    this.click();
+}, false);
+
+const meta = document.createElement('meta');
+meta.name = "viewport";
+meta.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no";
+document.getElementsByTagName('head')[0].appendChild(meta);
+
+// Handle tab visibility API for browsers that support it
+if (typeof document.hidden !== "undefined") {
+    const handleVisibilityChange = () => {
+        if (!document.hidden && player && typeof player.playVideo === 'function') {
+            player.playVideo();
+        }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange, false);
+}
+
+// Keep alive ping to prevent video pause
+setInterval(function() {
+    if (player && typeof player.playVideo === 'function') {
+        player.playVideo();
+    }
+}, 5000);
+
+window.dispatchEvent(new Event('resize'));
+
+tag.onerror = function() {
+    console.error('Failed to load YouTube iframe API');
+    setTimeout(() => {
+        const newTag = document.createElement('script');
+        newTag.src = "https://www.youtube.com/iframe_api";
+        firstScriptTag.parentNode.insertBefore(newTag, firstScriptTag);
+    }, 2000);
+};
+
+window.addEventListener('resize', function() {
+    const iframe = document.querySelector('iframe');
+    const videoRatio = 16/9;
+    const windowRatio = window.innerWidth / window.innerHeight;
+
+    iframe.style.position = 'absolute';
+    
+    if (windowRatio > videoRatio) {
+        const newHeight = window.innerWidth / videoRatio;
+        iframe.style.width = window.innerWidth + 'px';
+        iframe.style.height = newHeight + 'px';
+        iframe.style.top = -((newHeight - window.innerHeight) / 2) + 'px';
+        iframe.style.left = '0';
+    } else {
+        const newWidth = window.innerHeight * videoRatio;
+        iframe.style.width = newWidth + 'px';
+        iframe.style.height = window.innerHeight + 'px';
+        iframe.style.top = '0';
+        iframe.style.left = -((newWidth - window.innerWidth) / 2) + 'px';
+    }
+});
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body></html>
