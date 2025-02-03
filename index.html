@@ -1,4 +1,7 @@
-<html><head><base href="." target="_blank">
+<html>
+<head>
+<base href="." target="_blank">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <style>
 * {
     margin: 0;
@@ -47,6 +50,8 @@
     background: rgba(255, 255, 255, 0.9);
     width: 300px;
     font-family: Arial, sans-serif;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 #loadButton {
@@ -58,6 +63,8 @@
     cursor: pointer;
     font-family: Arial, sans-serif;
     transition: background-color 0.3s ease;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 #loadButton:hover {
@@ -304,20 +311,6 @@ window.addEventListener('load', function() {
     }
 });
 
-document.getElementById('urlInput').addEventListener('touchstart', function(e) {
-    e.preventDefault();
-}, false);
-
-document.getElementById('loadButton').addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    this.click();
-}, false);
-
-const meta = document.createElement('meta');
-meta.name = "viewport";
-meta.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no";
-document.getElementsByTagName('head')[0].appendChild(meta);
-
 // Handle tab visibility API for browsers that support it
 if (typeof document.hidden !== "undefined") {
     const handleVisibilityChange = () => {
@@ -369,4 +362,5 @@ window.addEventListener('resize', function() {
 });
 </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-</body></html>
+</body>
+</html>
