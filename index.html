@@ -151,13 +151,36 @@ function getYouTubeVideoId(url) {
     return (match && match[2].length === 11) ? match[2] : url;
 }
 
+function destroyPlayer() {
+    if (player) {
+        player.destroy();
+        player = null;
+    }
+    if (playbackMonitor) {
+        clearInterval(playbackMonitor);
+    }
+}
+
 function loadNewVideo(videoId) {
     currentVideoId = videoId;
-    const newSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&playlist=${videoId}&playsinline=1&enablejsapi=1&allow-background-playback=1&controls=0`;
-    document.querySelector('iframe').src = newSrc;
+    destroyPlayer();
+    
+    const iframe = document.createElement('iframe');
+    iframe.width = '100%';
+    iframe.height = '100%';
+    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&playlist=${videoId}&playsinline=1&enablejsapi=1&allow-background-playback=1&controls=0`;
+    iframe.frameBorder = '0';
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; background-playback; web-share';
+    iframe.allowFullscreen = true;
+    iframe.style.position = 'absolute';
+
+    const container = document.querySelector('.video-background');
+    container.innerHTML = '';
+    container.appendChild(iframe);
+
     document.getElementById('creditsButton').href = `https://www.youtube.com/watch?v=${videoId}`;
     
-    // Reinitialize the player
+    // Initialize new player
     setTimeout(() => {
         onYouTubeIframeAPIReady();
     }, 1000);
@@ -178,17 +201,14 @@ document.getElementById('urlInput').addEventListener('keypress', function(e) {
 });
 
 function onYouTubeIframeAPIReady() {
-    player = new YT.Player(document.querySelector('iframe'), {
+    const iframe = document.querySelector('.video-background iframe');
+    player = new YT.Player(iframe, {
         events: {
             'onReady': onPlayerReady,
             'onStateChange': onPlayerStateChange
         }
     });
 }
-
-let keepAliveInterval;
-let backgroundPlaybackAttempts = 0;
-const MAX_BACKGROUND_ATTEMPTS = 5;
 
 function forcePlayback() {
     if (player && typeof player.getPlayerState === 'function') {
@@ -214,19 +234,17 @@ function ensurePlayback() {
         const state = player.getPlayerState();
         if (state !== YT.PlayerState.PLAYING) {
             forcePlayback();
-            backgroundPlaybackAttempts++;
-            
-            if (backgroundPlaybackAttempts >= MAX_BACKGROUND_ATTEMPTS) {
-                clearInterval(keepAliveInterval);
-                keepAliveInterval = setInterval(forcePlayback, 500); // Increased frequency
-            }
         } else {
             backgroundPlaybackAttempts = 0;
             clearInterval(keepAliveInterval);
-            keepAliveInterval = setInterval(forcePlayback, 1000); // Increased frequency
+            keepAliveInterval = setInterval(forcePlayback, 1000); 
         }
     }
 }
+
+let keepAliveInterval;
+let backgroundPlaybackAttempts = 0;
+const MAX_BACKGROUND_ATTEMPTS = 5;
 
 function onPlayerReady(event) {
     player = event.target;
@@ -292,23 +310,30 @@ keepAliveInterval = setInterval(() => {
     ensurePlayback();
 }, 1000);
 
-// Additional recovery interval
-setInterval(() => {
-    if (player && typeof player.getPlayerState === 'function') {
-        const state = player.getPlayerState();
-        if (state !== YT.PlayerState.PLAYING) {
-            for (let i = 0; i < 3; i++) {
-                setTimeout(forcePlayback, i * 200);
-            }
-        }
+// Enhanced recovery system
+function recoverPlayback() {
+    if (!player || typeof player.getPlayerState !== 'function') {
+        loadNewVideo(currentVideoId);
+        return;
     }
-}, 1500);
+    
+    const state = player.getPlayerState();
+    if (state === -1 || state === YT.PlayerState.UNSTARTED) {
+        loadNewVideo(currentVideoId);
+    } else if (state !== YT.PlayerState.PLAYING) {
+        forcePlayback();
+    }
+}
 
-// Retain all existing event listeners and functionality
-window.addEventListener('load', function() {
-    if (!player || typeof player.unMute !== 'function') {
-        onYouTubeIframeAPIReady();
+// Add recovery check every 5 seconds
+setInterval(recoverPlayback, 5000);
+
+// Enhance visibility change handling
+document.addEventListener("visibilitychange", function() {
+    if (!document.hidden) {
+        recoverPlayback();
     }
+    ensurePlayback();
 });
 
 // Handle tab visibility API for browsers that support it
@@ -358,6 +383,13 @@ window.addEventListener('resize', function() {
         iframe.style.height = window.innerHeight + 'px';
         iframe.style.top = '0';
         iframe.style.left = -((newWidth - window.innerWidth) / 2) + 'px';
+    }
+});
+
+// Initialize the page
+window.addEventListener('load', function() {
+    if (!player || typeof player.unMute !== 'function') {
+        onYouTubeIframeAPIReady();
     }
 });
 </script>
